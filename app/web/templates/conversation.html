@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}{{ labels.format_phone(conv.id) }}{% endblock %}
+{% block content %}
+<p><a href="/admin">← Conversas</a></p>
+
+<section class="card">
+  <div class="title-row">
+    <h1>{{ (draft.name if draft and draft.name else none) or "Sem nome" }}</h1>
+    <span class="pill state-{{ conv.state.value|lower }}">{{ labels.STATE_LABELS[conv.state] }}</span>
+  </div>
+  <p>
+    WhatsApp: <strong>{{ labels.format_phone(conv.id) }}</strong>
+    · <a href="https://wa.me/{{ conv.id }}" rel="noopener noreferrer" target="_blank">abrir conversa</a>
+  </p>
+  {% if conv.handoff_reason %}<p class="reason">{{ labels.reason_label(conv.handoff_reason) }}</p>{% endif %}
+  {% if conv.assignee %}<p class="muted">Responsável: {{ conv.assignee }}</p>{% endif %}
+
+  <div class="actions">
+    {% for key, title in actions %}
+    <form method="post" action="/admin/conversas/{{ conv.id }}/acao">
+      <input type="hidden" name="csrf_token" value="{{ auth.session.csrf_token }}">
+      <input type="hidden" name="action" value="{{ key }}">
+      <button type="submit" class="{{ 'primary' if key == 'take_over' else '' }}">{{ title }}</button>
+    </form>
+    {% endfor %}
+  </div>
+</section>
+
+{% if draft %}
+<section class="card">
+  <h2>Pedido</h2>
+  {% if draft.redacted_at %}<p class="muted">Dados pessoais removidos pela política de retenção.</p>{% endif %}
+  <dl class="fields">
+    <dt>Modalidade</dt><dd>{{ labels.MODALITY_LABELS.get(draft.modality) or draft.modality_raw or "—" }}</dd>
+    <dt>Telefone</dt><dd>{{ draft.phone_raw or "—" }}</dd>
+    {% if draft.modality and draft.modality.value == "delivery" %}
+    <dt>Endereço</dt><dd>{{ draft.address or "—" }}</dd>
+    <dt>Referência</dt><dd>{{ draft.reference or "—" }}</dd>
+    <dt>Taxa</dt><dd>{{ draft.delivery_fee_raw or "—" }} <span class="tag">não verificada</span></dd>
+    {% endif %}
+    <dt>Pagamento</dt><dd>{{ labels.PAYMENT_LABELS.get(draft.payment) or draft.payment_raw or "—" }}</dd>
+    {% if draft.payment and draft.payment.value == "dinheiro" %}
+    <dt>Troco</dt>
+    <dd>{% if draft.change_needed is none %}—{% elif draft.change_needed %}Sim{% if draft.change_for %}, para R$ {{ draft.change_for }}{% endif %}{% else %}Não precisa{% endif %}</dd>
+    {% endif %}
+  </dl>
+
+  {% for item in draft.items %}
+  <div class="item">
+    <h3>{{ item.quantity or item.quantity_raw or "?" }}× {{ item.size or "tamanho não informado" }}</h3>
+    <dl class="fields">
+      <dt>Base</dt><dd>{{ item.base or "—" }}</dd>
+      <dt>Cremes</dt><dd>{{ item.creams|join(", ") or "—" }}</dd>
+      <dt>Sorvetes</dt><dd>{{ item.ice_creams|join(", ") or "—" }}</dd>
+      <dt>Adicionais</dt><dd>{{ item.extras|join(", ") or "—" }}</dd>
+      {% for f in item.unknown_fields %}<dt>{{ f.label }}</dt><dd>{{ f.value }} <span class="tag">não reconhecido</span></dd>{% endfor %}
+    </dl>
+  </div>
+  {% endfor %}
+
+  {% if draft.unknown_fields or draft.unparsed_lines %}
+  <h3>Trechos não reconhecidos</h3>
+  <ul class="plain">
+    {% for f in draft.unknown_fields %}<li>{{ f.label }}: {{ f.value }}</li>{% endfor %}
+    {% for line in draft.unparsed_lines %}<li>{{ line }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if issues %}
+  <h3>Avisos para conferir</h3>
+  <ul class="warnings">
+    {% for issue in issues %}<li>{{ labels.issue_label(issue) }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="card">
+  <h2>Mensagens</h2>
+  <ol class="timeline">
+    {% for item in timeline %}
+    <li class="{{ 'in' if item.inbound else 'out' }}">
+      <span class="meta">{{ 'Cliente' if item.inbound else 'Assistente' }} · {{ local(item.at) }}{% if not item.inbound %} · {{ labels.OUTBOUND_STATUS_LABELS[item.status] }}{% endif %}</span>
+      {% if item.redacted %}
+      <em class="muted">conteúdo removido (retenção)</em>
+      {% elif item.inbound and item.type.value != "text" %}
+      <em class="muted">[{{ item.type.value }} — não lido pelo sistema]</em>
+      {% else %}
+      <p class="msg">{{ item.text }}</p>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+{% endblock %}

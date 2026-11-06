@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block head %}<meta http-equiv="refresh" content="20">{% endblock %}
+{% block title %}Conversas{% endblock %}
+{% block content %}
+<nav class="tabs" aria-label="Filtro de conversas">
+  {% for key, (title, _states) in views.items() %}
+  <a href="/admin?view={{ key }}" {% if key == view %}aria-current="page" class="active"{% endif %}>
+    {{ title }} <span class="count">{{ counts[key] }}</span>
+  </a>
+  {% endfor %}
+</nav>
+
+{% if not rows %}
+<p class="empty">Nenhuma conversa aqui. A lista atualiza sozinha.</p>
+{% endif %}
+
+<ul class="list">
+  {% for row in rows %}
+  <li>
+    <a class="row" href="/admin/conversas/{{ row.conv.id }}">
+      <span class="row-main">
+        <strong>{{ row.name or "Sem nome" }}</strong>
+        <span class="muted">{{ labels.format_phone(row.conv.id) }}</span>
+      </span>
+      <span class="row-meta">
+        {% if row.conv.handoff_reason %}<span class="reason">{{ labels.reason_label(row.conv.handoff_reason) }}</span>{% endif %}
+        <span class="muted">{{ ago(row.conv.last_customer_message_at) }}{% if row.conv.assignee %} · com {{ row.conv.assignee }}{% endif %}</span>
+      </span>
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% endblock %}

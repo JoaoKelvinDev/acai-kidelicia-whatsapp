@@ -4,13 +4,13 @@ from datetime import datetime
 
 from app.domain.enums import HUMAN_STATES, ConversationState
 from app.domain.models import AuditEvent, Conversation
-from app.repositories.base import Repository
+from app.repositories.base import Tx
 
 _EPOCH_STATES = HUMAN_STATES | {ConversationState.CLOSED}
 
 
 async def transition(
-    repo: Repository,
+    tx: Tx,
     conv: Conversation,
     new_state: ConversationState,
     *,
@@ -28,13 +28,13 @@ async def transition(
     cancelled = 0
     if new_state in _EPOCH_STATES or old_state in _EPOCH_STATES:
         conv.reply_epoch += 1
-        cancelled = await repo.cancel_pending_outbound(
+        cancelled = await tx.cancel_pending_outbound(
             conv.id, reason=f"transicao_{new_state.value.lower()}", now=now
         )
     conv.state = new_state
     conv.updated_at = now
     conv.handoff_reason = reason if new_state in HUMAN_STATES else None
-    await repo.add_audit(
+    await tx.add_audit(
         AuditEvent(
             conversation_id=conv.id,
             kind="transicao_estado",

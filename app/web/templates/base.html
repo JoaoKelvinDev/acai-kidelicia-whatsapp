@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {% block head %}{% endblock %}
+  <title>{% block title %}Painel{% endblock %} · {{ store.store_name }}</title>
+  <link rel="stylesheet" href="/admin/static/admin.css">
+</head>
+<body>
+  {% if auth %}
+  <header class="topbar">
+    <a class="brand" href="/admin">{{ store.store_name }}</a>
+    <nav>
+      <a href="/admin">Conversas</a>
+      {% if auth.operator.is_admin %}<a href="/admin/configuracoes">Configurações</a>{% endif %}
+      <form method="post" action="/admin/logout" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ auth.session.csrf_token }}">
+        <button class="link" type="submit">Sair ({{ auth.operator.username }})</button>
+      </form>
+    </nav>
+  </header>
+  <div class="status-bar">
+    <span class="pill status-{{ store_status.value }}">{{ labels.STORE_STATUS_LABELS[store_status] }}</span>
+    {% if store.automation_paused %}<span class="pill danger">Automação pausada</span>{% endif %}
+  </div>
+  {% endif %}
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

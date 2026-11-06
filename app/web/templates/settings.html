@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Configurações{% endblock %}
+{% block content %}
+<h1>Configurações da loja</h1>
+{% if saved %}<p class="alert ok" role="status">Configuração salva.</p>{% endif %}
+{% for e in errors or [] %}<p class="alert danger" role="alert">{{ e }}</p>{% endfor %}
+
+<section class="card">
+  <h2>Automação</h2>
+  {% if store.automation_paused %}
+  <p>A automação está <strong>pausada</strong>: as mensagens são registradas, mas o assistente não responde.</p>
+  {% else %}
+  <p>A automação está ativa.</p>
+  {% endif %}
+  <form method="post" action="/admin/pausa-global">
+    <input type="hidden" name="csrf_token" value="{{ auth.session.csrf_token }}">
+    <input type="hidden" name="paused" value="{{ '0' if store.automation_paused else '1' }}">
+    <button type="submit" class="{{ 'primary' if store.automation_paused else 'danger' }}">
+      {{ 'Retomar automação' if store.automation_paused else 'Pausar toda a automação' }}
+    </button>
+  </form>
+</section>
+
+{% set current_status = store.status_override.value if store.status_override else 'auto' %}
+<form method="post" action="/admin/configuracoes" class="card stack">
+  <input type="hidden" name="csrf_token" value="{{ auth.session.csrf_token }}">
+  <h2>Funcionamento</h2>
+  <label>Status
+    <select name="status">
+      {% for value, title in STORE_STATUS_CHOICES %}
+      <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ title }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <p class="muted">Sem status manual e sem horários, a loja fica como “não configurada” e nenhum pedido é confirmado automaticamente.</p>
+
+  <fieldset>
+    <legend>Horários ({{ store.timezone }})</legend>
+    {% for day in range(7) %}
+    {% set w = hours[day] %}
+    <div class="hours-row">
+      <label class="check"><input type="checkbox" name="open_{{ day }}" {% if w %}checked{% endif %}> {{ labels.WEEKDAYS[day] }}</label>
+      <input type="time" name="start_{{ day }}" value="{{ w.start.strftime('%H:%M') if w else '' }}" aria-label="Abre {{ labels.WEEKDAYS[day] }}">
+      <input type="time" name="end_{{ day }}" value="{{ w.end.strftime('%H:%M') if w else '' }}" aria-label="Fecha {{ labels.WEEKDAYS[day] }}">
+    </div>
+    {% endfor %}
+  </fieldset>
+
+  <label>Link do site
+    <input name="website_url" type="url" value="{{ store.website_url or '' }}" placeholder="https://">
+  </label>
+  <button type="submit" class="primary">Salvar</button>
+</form>
+{% endblock %}

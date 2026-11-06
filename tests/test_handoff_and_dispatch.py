@@ -24,7 +24,7 @@ async def test_stale_epoch_is_rechecked_at_send_time(h):
     [intent] = await h.outbound()
     conv = await h.conversation()
     conv.reply_epoch += 1
-    await h.c.repo.save_conversation(conv)
+    await h.q("save_conversation", conv)
     [result] = await h.c.dispatcher.dispatch_pending(SENDER)
     assert result.status is OutboundStatus.CANCELLED
     assert result.status_reason == "estado_alterado"
@@ -64,12 +64,12 @@ async def test_inside_24h_window_is_sent(h, clock):
     assert result.status is OutboundStatus.SENT
 
 
-async def test_gateway_failure_is_recorded(h):
-    h.gateway.fail_next(GatewayError("rate_limit", retryable=True))
+async def test_permanent_gateway_failure_is_recorded(h):
+    h.gateway.fail_next(GatewayError("destinatario_invalido"))
     await h.receive("Oi")
     [intent] = await h.outbound()
     assert intent.status is OutboundStatus.FAILED
-    assert intent.status_reason == "rate_limit"
+    assert intent.status_reason == "destinatario_invalido"
 
 
 async def test_unknown_outcome_is_not_resent_blindly(h):
@@ -102,7 +102,7 @@ async def test_close_keeps_history(h):
     await h.receive("Oi")
     await h.c.handoff.close(SENDER, "joao")
     assert (await h.conversation()).state is ConversationState.CLOSED
-    assert len(await h.c.repo.list_inbound(SENDER)) == 1
+    assert len(await h.q("list_inbound", SENDER)) == 1
     assert len(await h.outbound()) == 1
 
 
@@ -116,7 +116,7 @@ async def test_actions_require_actor_and_existing_conversation(h):
 async def test_audit_records_transitions_without_personal_data(h):
     await h.receive(load_order("delivery_pix_valido"))
     await h.c.handoff.take_over(SENDER, "joao")
-    events = await h.c.repo.list_audit(SENDER)
+    events = await h.q("list_audit", SENDER)
     transitions = [e for e in events if e.kind == "transicao_estado"]
     assert [(e.detail["para"], e.actor) for e in transitions] == [
         ("HUMAN_PENDING", "bot"),
@@ -132,6 +132,6 @@ async def test_optimistic_version_check(h):
     await h.receive("Oi")
     stale = await h.conversation()
     fresh = await h.conversation()
-    await h.c.repo.save_conversation(fresh)
+    await h.q("save_conversation", fresh)
     with pytest.raises(ConcurrencyError):
-        await h.c.repo.save_conversation(stale)
+        await h.q("save_conversation", stale)

@@ -1,9 +1,11 @@
 """Modelos de domínio. Persistência real (SQL) entra na Etapa 2."""
 
+import secrets
+import threading
+import time
 from datetime import datetime
 from decimal import Decimal
 from typing import Literal
-from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
@@ -18,9 +20,17 @@ from app.domain.enums import (
     ReplyKind,
 )
 
+_id_lock = threading.Lock()
+_last_id_micros = 0
+
 
 def new_id() -> str:
-    return uuid4().hex
+    """ID de 32 hex ordenável pelo momento de criação (desempate estável em listagens)."""
+    global _last_id_micros
+    with _id_lock:
+        _last_id_micros = max(time.time_ns() // 1000, _last_id_micros + 1)
+        prefix = _last_id_micros
+    return f"{prefix:014x}{secrets.token_hex(9)}"
 
 
 class InboundMessage(BaseModel):
@@ -30,6 +40,7 @@ class InboundMessage(BaseModel):
     text: str | None = None
     timestamp: datetime
     received_at: datetime
+    redacted_at: datetime | None = None  # texto removido pela política de retenção
 
 
 class Conversation(BaseModel):
@@ -107,6 +118,7 @@ class OrderDraft(BaseModel):
     correction_attempts: int = 0
     created_at: datetime
     updated_at: datetime
+    redacted_at: datetime | None = None
 
 
 class OutboundIntent(BaseModel):
@@ -120,9 +132,13 @@ class OutboundIntent(BaseModel):
     reply_epoch: int
     source_message_id: str | None = None
     provider_message_id: str | None = None
+    attempts: int = 0
+    next_attempt_at: datetime | None = None  # None = imediato
+    sending_started_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
     sent_at: datetime | None = None
+    redacted_at: datetime | None = None
 
 
 AuditValue = str | int | bool | None | list[str]

@@ -141,7 +141,7 @@ async def test_two_failed_attempts_hand_off(h):
 
 
 async def test_attempt_limit_is_configurable(harness_factory):
-    h = harness_factory(max_correction_attempts=1)
+    h = await harness_factory(max_correction_attempts=1)
     await h.receive(load_order("referencia_invalida"))
     await h.receive("hmm")
     assert (await h.conversation()).state is ConversationState.HUMAN_PENDING
@@ -190,7 +190,7 @@ async def test_new_site_order_while_collecting_replaces_draft(h):
     drafts = await h.drafts()
     assert len(drafts) == 2
     assert (await h.kinds())[-1] is ReplyKind.CONFIRMATION
-    audit_kinds = [e.kind for e in await h.c.repo.list_audit(drafts[0].conversation_id)]
+    audit_kinds = [e.kind for e in await h.q("list_audit", drafts[0].conversation_id)]
     assert "rascunho_substituido" in audit_kinds
 
 
@@ -206,7 +206,7 @@ async def test_new_site_order_while_collecting_replaces_draft(h):
     ],
 )
 async def test_store_not_open_never_confirms(harness_factory, status, kind):
-    h = harness_factory(status_override=status)
+    h = await harness_factory(status_override=status)
     await h.receive(load_order("delivery_pix_valido"))
     assert await h.kinds() == [kind]
     text = h.sent_texts()[0]
@@ -219,11 +219,11 @@ async def test_store_not_open_never_confirms(harness_factory, status, kind):
 async def test_opening_hours_decide_open_or_closed(harness_factory, clock):
     # 06/11/2026 é sexta-feira (weekday=4); START = 15:00 em São Paulo.
     hours = [OpeningWindow(weekday=4, start=time(14, 0), end=time(22, 0))]
-    h = harness_factory(status_override=None, opening_hours=hours)
+    h = await harness_factory(status_override=None, opening_hours=hours)
     await h.receive(load_order("delivery_pix_valido"))
     assert await h.kinds() == [ReplyKind.CONFIRMATION]
 
-    h2 = harness_factory(status_override=None, opening_hours=hours)
+    h2 = await harness_factory(status_override=None, opening_hours=hours)
     clock.advance(hours=8)  # 23:00 local
     await h2.receive(load_order("delivery_pix_valido"))
     assert await h2.kinds() == [ReplyKind.STORE_CLOSED]
@@ -244,7 +244,7 @@ async def test_greeting_offers_site_link_without_inventing_info(h):
 
 
 async def test_greeting_without_configured_link(harness_factory):
-    h = harness_factory(website_url=None)
+    h = await harness_factory(website_url=None)
     await h.receive("Bom dia")
     assert "http" not in h.sent_texts()[0]
 
@@ -259,7 +259,7 @@ async def test_buy_intent_redirects_to_site_without_asking_personal_data(h):
 
 
 async def test_buy_intent_without_link_goes_to_human(harness_factory):
-    h = harness_factory(website_url=None)
+    h = await harness_factory(website_url=None)
     await h.receive("quero um açaí")
     assert (await h.conversation()).state is ConversationState.HUMAN_PENDING
 
@@ -303,7 +303,7 @@ async def test_media_default_forwards_and_asks_text(h):
 
 
 async def test_media_ask_text_policy_keeps_automation(harness_factory):
-    h = harness_factory(media_policy=MediaPolicy.ASK_TEXT)
+    h = await harness_factory(media_policy=MediaPolicy.ASK_TEXT)
     await h.receive(type=MessageType.IMAGE)
     assert await h.kinds() == [ReplyKind.MEDIA]
     assert (await h.conversation()).state is ConversationState.AUTO_ACTIVE
@@ -315,7 +315,7 @@ async def test_human_states_block_replies_but_keep_messages(h):
     assert result.skipped_reason == "atendimento_humano"
     assert result.outbound_ids == []
     assert len(h.gateway.sent) == 1
-    assert len(await h.c.repo.list_inbound(h.inbound().conversation_id)) == 2
+    assert len(await h.q("list_inbound", h.inbound().conversation_id)) == 2
 
 
 async def test_global_pause_blocks_replies_but_keeps_messages(h):
@@ -324,7 +324,7 @@ async def test_global_pause_blocks_replies_but_keeps_messages(h):
     assert result.skipped_reason == "pausa_global"
     assert h.gateway.sent == []
     assert await h.drafts() == []
-    assert len(await h.c.repo.list_inbound(h.inbound().conversation_id)) == 1
+    assert len(await h.q("list_inbound", h.inbound().conversation_id)) == 1
 
 
 async def test_closed_conversation_is_not_reopened_by_bot(h):
@@ -366,7 +366,7 @@ async def test_concurrent_distinct_messages_are_serialized(h):
     await asyncio.gather(h.receive(order), h.receive(order))
     # A primeira confirma e coloca em HUMAN_PENDING; a segunda só é registrada.
     assert await h.kinds() == [ReplyKind.CONFIRMATION]
-    assert len(await h.c.repo.list_inbound(h.inbound().conversation_id)) == 2
+    assert len(await h.q("list_inbound", h.inbound().conversation_id)) == 2
 
 
 async def test_same_text_new_id_after_resume_is_flagged_as_possible_duplicate(h):

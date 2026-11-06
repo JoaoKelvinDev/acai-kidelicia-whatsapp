@@ -26,7 +26,7 @@ from app.domain.store import StoreSettings
 from app.domain.validation import ValidationResult, validate_draft
 from app.parsers.pending_reply import parse_pending_reply
 from app.parsers.site_order import parse_site_order, set_order_field
-from app.repositories.base import Repository
+from app.repositories.base import Database, Tx
 from app.services.intents import classify
 from app.services.replies import ask_data_text, confirmation_text, render
 from app.services.transitions import transition
@@ -61,6 +61,7 @@ class HandleResult(BaseModel):
 
 @dataclass
 class _Ctx:
+    tx: Tx
     conv: Conversation
     store: StoreSettings
     msg: InboundMessage
@@ -69,19 +70,21 @@ class _Ctx:
 
 
 class ConversationService:
-    def __init__(self, repo: Repository, clock: Clock) -> None:
-        self._repo = repo
+    def __init__(self, db: Database, clock: Clock) -> None:
+        self._db = db
         self._clock = clock
 
     async def handle_inbound(self, msg: InboundMessage) -> HandleResult:
-        async with self._repo.lock(msg.conversation_id):
-            if not await self._repo.add_inbound(msg):
+        # Uma transação: mensagem, estado, rascunho, respostas e auditoria são gravados juntos.
+        # Se algo falhar, nada fica gravado e o reenvio do mesmo evento é processado de novo.
+        async with self._db.transaction() as tx:
+            if not await tx.add_inbound(msg):
                 logger.info("mensagem duplicada ignorada id=%s", msg.provider_message_id)
                 return HandleResult(duplicate=True)
 
             now = self._clock.now()
-            store = await self._repo.get_store_settings()
-            conv = await self._repo.get_conversation(msg.conversation_id) or Conversation(
+            store = await tx.get_store_settings()
+            conv = await tx.get_conversation(msg.conversation_id) or Conversation(
                 id=msg.conversation_id, created_at=now, updated_at=now
             )
             last = conv.last_customer_message_at
@@ -90,7 +93,7 @@ class ConversationService:
             )
             conv.last_inbound_message_id = msg.provider_message_id
             conv.updated_at = now
-            ctx = _Ctx(conv=conv, store=store, msg=msg, now=now)
+            ctx = _Ctx(tx=tx, conv=conv, store=store, msg=msg, now=now)
 
             if store.automation_paused:
                 ctx.result.skipped_reason = "pausa_global"
@@ -105,7 +108,7 @@ class ConversationService:
             else:
                 await self._route(ctx)
 
-            saved = await self._repo.save_conversation(conv)
+            saved = await tx.save_conversation(conv)
             ctx.result.conversation_state = saved.state
             logger.info(
                 "mensagem processada conversa=%s intencao=%s estado=%s respostas=%d motivo=%s",
@@ -175,7 +178,7 @@ class ConversationService:
         await self._evaluate(ctx, draft, previous_pending=None)
 
     async def _pending_reply(self, ctx: _Ctx) -> None:
-        draft = await self._repo.get_draft(ctx.conv.active_draft_id or "")
+        draft = await ctx.tx.get_draft(ctx.conv.active_draft_id or "")
         if draft is None:
             await self._handoff(
                 ctx, "rascunho_nao_encontrado", ReplyKind.HANDOFF, ctx.store.texts.handoff
@@ -279,7 +282,7 @@ class ConversationService:
 
     async def _find_duplicate(self, ctx: _Ctx, draft: OrderDraft) -> str | None:
         window = timedelta(minutes=ctx.store.duplicate_window_minutes)
-        for other in await self._repo.list_drafts(ctx.conv.id):
+        for other in await ctx.tx.list_drafts(ctx.conv.id):
             if (
                 other.fingerprint == draft.fingerprint
                 and other.source_message_id != draft.source_message_id
@@ -295,7 +298,7 @@ class ConversationService:
         await self._reply(ctx, kind, render(template, ctx.store))
 
     async def _transition(self, ctx: _Ctx, state: ConversationState, reason: str) -> None:
-        await transition(self._repo, ctx.conv, state, reason=reason, actor=BOT_ACTOR, now=ctx.now)
+        await transition(ctx.tx, ctx.conv, state, reason=reason, actor=BOT_ACTOR, now=ctx.now)
 
     async def _reply(self, ctx: _Ctx, kind: ReplyKind, text: str) -> None:
         intent = OutboundIntent(
@@ -308,15 +311,15 @@ class ConversationService:
             created_at=ctx.now,
             updated_at=ctx.now,
         )
-        if await self._repo.add_outbound(intent):
+        if await ctx.tx.add_outbound(intent):
             ctx.result.outbound_ids.append(intent.id)
 
     async def _save_draft(self, ctx: _Ctx, draft: OrderDraft) -> None:
         draft.updated_at = ctx.now
-        await self._repo.save_draft(draft)
+        await ctx.tx.save_draft(draft)
 
     async def _audit(self, ctx: _Ctx, kind: str, **detail: str | list[str]) -> None:
-        await self._repo.add_audit(
+        await ctx.tx.add_audit(
             AuditEvent(
                 conversation_id=ctx.conv.id,
                 kind=kind,

@@ -4,6 +4,7 @@ Não têm autenticação porque não são registradas fora do ambiente de desenv
 dependência abaixo é uma segunda barreira caso alguém as inclua por engano.
 """
 
+from dataclasses import asdict
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
@@ -52,17 +53,17 @@ def _dump(model: BaseModel) -> dict[str, Any]:
 
 
 async def _conversation_view(container: Container, conversation_id: str) -> dict[str, Any]:
-    repo = container.repo
-    conv = await repo.get_conversation(conversation_id)
-    if conv is None:
-        raise HTTPException(status_code=404, detail="conversa não encontrada")
-    return {
-        "conversation": _dump(conv),
-        "messages": [_dump(m) for m in await repo.list_inbound(conversation_id)],
-        "drafts": [_dump(d) for d in await repo.list_drafts(conversation_id)],
-        "outbound": [_dump(o) for o in await repo.list_outbound(conversation_id)],
-        "audit": [_dump(e) for e in await repo.list_audit(conversation_id)],
-    }
+    async with container.db.transaction() as tx:
+        conv = await tx.get_conversation(conversation_id)
+        if conv is None:
+            raise HTTPException(status_code=404, detail="conversa não encontrada")
+        return {
+            "conversation": _dump(conv),
+            "messages": [_dump(m) for m in await tx.list_inbound(conversation_id)],
+            "drafts": [_dump(d) for d in await tx.list_drafts(conversation_id)],
+            "outbound": [_dump(o) for o in await tx.list_outbound(conversation_id)],
+            "audit": [_dump(e) for e in await tx.list_audit(conversation_id)],
+        }
 
 
 @router.post("/simulate/inbound")
@@ -116,13 +117,20 @@ async def automation_pause(body: GlobalPauseRequest, container: ContainerDep) ->
 
 @router.get("/store-settings")
 async def get_store_settings(container: ContainerDep) -> dict[str, Any]:
-    return _dump(await container.repo.get_store_settings())
+    async with container.db.transaction() as tx:
+        return _dump(await tx.get_store_settings())
 
 
 @router.put("/store-settings")
 async def put_store_settings(body: StoreSettings, container: ContainerDep) -> dict[str, Any]:
-    await container.repo.save_store_settings(body)
+    async with container.db.transaction() as tx:
+        await tx.save_store_settings(body, container.clock.now())
     return _dump(body)
+
+
+@router.post("/retention/purge")
+async def purge(container: ContainerDep, dry_run: bool = True) -> dict[str, Any]:
+    return asdict(await container.retention.purge(dry_run=dry_run))
 
 
 @router.get("/sent")

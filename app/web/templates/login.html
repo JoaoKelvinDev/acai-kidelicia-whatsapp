@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Entrar{% endblock %}
+{% block content %}
+<section class="card narrow">
+  <h1>Painel da equipe</h1>
+  <p class="muted">{{ store.store_name }}</p>
+  {% if error %}<p class="alert danger" role="alert">{{ error }}</p>{% endif %}
+  <form method="post" action="/admin/login" class="stack">
+    <label>Usuário
+      <input name="username" autocomplete="username" autocapitalize="none" required maxlength="80">
+    </label>
+    <label>Senha
+      <input name="password" type="password" autocomplete="current-password" required maxlength="200">
+    </label>
+    <button type="submit" class="primary">Entrar</button>
+  </form>
+</section>
+{% endblock %}
