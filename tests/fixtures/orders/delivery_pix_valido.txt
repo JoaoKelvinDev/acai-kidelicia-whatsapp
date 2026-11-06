@@ -1,0 +1,17 @@
+Novo pedido - Açaí Ki-Delícia PL
+Nome: Mariana Souza
+Telefone: (11) 97412-3058
+Modalidade: Delivery
+Endereço: Rua das Acácias, 245, Jardim Primavera
+Ponto de referência: Ao lado da padaria azul
+Taxa de Entrega: R$ 3.00
+------------------------------
+Pedido
+• Quantidade: 1x
+• Tamanho: Copo 500ml
+• Base: Açaí Tradicional
+• Cremes: Creme de Ninho, Creme de Cupuaçu
+• Sorvetes: Abacaxi
+• Adicionais: Leite Condensado, Granola
+Pagamento: Pix
+Obrigado!

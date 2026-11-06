@@ -1,0 +1,14 @@
+Novo pedido - Açaí Ki-Delícia PL
+Nome: Carlos Henrique Lima
+Telefone: 11974123058
+Modalidade: Retirada
+------------------------------
+Pedido
+• Quantidade: 2x
+• Tamanho: Copo 300ml
+• Base: Açaí Tradicional
+• Cremes: Creme de Morango
+• Sorvetes:
+• Adicionais: Paçoca
+Pagamento: Cartão
+Obrigado!

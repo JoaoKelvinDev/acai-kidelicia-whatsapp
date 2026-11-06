@@ -1,0 +1,17 @@
+Novo pedido - Açaí Ki-Delícia PL
+Nome: Patrícia Gomes
+Telefone: (11) 97412-3058
+Modalidade: Delivery
+Endereço: Travessa Ipê Amarelo, sem número, Vila Nova
+Ponto de referência: Portão verde em frente à praça
+Taxa de Entrega: R$ 5,00
+------------------------------
+Pedido
+• Quantidade: 1x
+• Tamanho: Copo 700ml
+• Base: Açaí Tradicional
+• Cremes: Creme de Ninho
+• Sorvetes: Flocos
+• Adicionais: Banana, Granola
+Pagamento: Dinheiro
+Obrigado!

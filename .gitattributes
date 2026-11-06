@@ -1,0 +1,3 @@
+* text=auto eol=lf
+# Fixtures de pedido preservam bytes exatos (emojis, "�").
+tests/fixtures/** -text

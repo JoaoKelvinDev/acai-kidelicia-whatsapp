@@ -1,0 +1,23 @@
+Novo pedido - Açaí Ki-Delícia PL
+Nome: João Pedro Alves
+Telefone: (11) 97412-3058
+Modalidade: Delivery
+Endereço: Av. Brasil, 1500, apto 32, Centro
+Ponto de referência: Prédio com fachada azul
+Taxa de Entrega: R$ 4.50
+------------------------------
+Pedido
+• Quantidade: 2x
+• Tamanho: Copo 500ml
+• Base: Açaí Tradicional
+• Cremes: Creme de Ninho
+• Sorvetes: Morango
+• Adicionais: Leite em Pó
+• Quantidade: 1x
+• Tamanho: Copo 300ml
+• Base: Açaí Zero
+• Cremes: Creme de Maracujá, Creme de Cupuaçu
+• Sorvetes:
+• Adicionais: Granola, Mel
+Pagamento: Cartão
+Obrigado!

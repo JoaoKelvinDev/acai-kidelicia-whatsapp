@@ -1,0 +1,17 @@
+Novo pedido - Açaí Ki-Delícia PL
+Nome: Teste
+Telefone: 00000000000
+Modalidade: Delivery
+Endereço: Teste
+Ponto de referência: Teste
+Taxa de Entrega: R$ 3.00
+------------------------------
+Pedido
+• Quantidade: 1x
+• Tamanho: Copo 500ml
+• Base: Açaí Zero
+• Cremes: Creme de Maracujá, Creme de Cupuaçu, Creme de Nutela, Creme de Ninho
+• Sorvetes: Abacaxi, Prestígio, Babalu, Terremoto, Bombom Ferrero, Tapioca
+• Adicionais: Leite Condensado, Côco Ralado, Amendoim
+Pagamento: Pix
+Obrigado!
