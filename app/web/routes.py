@@ -216,6 +216,7 @@ async def conversation_detail(request: Request, auth: AuthDep, conversation_id: 
     timeline: list[dict[str, Any]] = [
         {
             "at": m.timestamp,
+            "order": m.received_at,
             "inbound": True,
             "text": m.text,
             "type": m.type,
@@ -225,15 +226,20 @@ async def conversation_detail(request: Request, auth: AuthDep, conversation_id: 
     ] + [
         {
             "at": o.created_at,
+            "order": o.created_at,
             "inbound": False,
             "text": o.text,
             "status": o.status,
             "kind": o.kind,
+            "delivery": o.delivery_status,
+            "delivery_error": o.delivery_error_code,
             "redacted": o.redacted_at,
         }
         for o in outbound
     ]
-    timeline.sort(key=lambda item: item["at"])
+    # Ordena pelo relógio do servidor (o horário da Meta é arredondado ao segundo e pode
+    # ficar "depois" da resposta que ele mesmo originou).
+    timeline.sort(key=lambda item: item["order"])
     return await _render(
         request,
         "conversation.html",

@@ -1,6 +1,13 @@
 """Textos do painel em português para estados, motivos e avisos."""
 
-from app.domain.enums import ConversationState, Modality, OutboundStatus, PaymentMethod, StoreStatus
+from app.domain.enums import (
+    ConversationState,
+    DeliveryStatus,
+    Modality,
+    OutboundStatus,
+    PaymentMethod,
+    StoreStatus,
+)
 from app.domain.models import Issue
 
 STATE_LABELS = {
@@ -38,6 +45,7 @@ REASON_LABELS = {
     "rascunho_nao_encontrado": "Pedido anterior não encontrado",
     "assumida": "Assumida pela equipe",
     "pausada": "Pausada pela equipe",
+    "resposta_pelo_aplicativo": "Equipe respondeu pelo aplicativo",
 }
 
 ISSUE_LABELS = {
@@ -82,6 +90,12 @@ OUTBOUND_STATUS_LABELS = {
     OutboundStatus.UNKNOWN: "resultado incerto",
     OutboundStatus.CANCELLED: "cancelada",
     OutboundStatus.BLOCKED: "bloqueada",
+}
+DELIVERY_LABELS = {
+    DeliveryStatus.SENT: "enviada",
+    DeliveryStatus.DELIVERED: "entregue",
+    DeliveryStatus.READ: "lida",
+    DeliveryStatus.FAILED: "não entregue",
 }
 WEEKDAYS = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
 

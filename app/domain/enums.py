@@ -101,3 +101,12 @@ class OutboundStatus(StrEnum):
 class MediaPolicy(StrEnum):
     HANDOFF = "handoff"
     ASK_TEXT = "ask_text"
+
+
+class DeliveryStatus(StrEnum):
+    """Status informado pela Meta depois que a API aceitou a mensagem."""
+
+    SENT = "sent"
+    DELIVERED = "delivered"
+    READ = "read"
+    FAILED = "failed"

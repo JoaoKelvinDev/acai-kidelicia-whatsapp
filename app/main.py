@@ -2,14 +2,15 @@
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 
 from fastapi import FastAPI, Request, Response
-from fastapi.responses import RedirectResponse
+from fastapi.responses import PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import health, simulation
+from app.api import health, simulation, webhook
 from app.core.config import Settings
 from app.core.container import Container, build_container
 from app.core.logging import configure_logging
@@ -33,6 +34,12 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
     configure_logging(settings.log_level)
     container = container or build_container(settings)
     dev = settings.dev_tools_enabled
+    if dev and settings.webhook_enabled:
+        logging.getLogger(__name__).warning(
+            "Webhook configurado com APP_ENV=%s: as rotas /dev (sem login) estão ativas. "
+            "Nunca exponha este servidor por túnel assim; use APP_ENV=staging.",
+            settings.app_env,
+        )
 
     @contextlib.asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -50,7 +57,7 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
                 worker_task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await worker_task
-            await container.engine.dispose()
+            await container.aclose()
 
     app = FastAPI(
         title="Açaí Ki-Delícia PL — atendimento WhatsApp",
@@ -66,8 +73,13 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
     async def admin_security_headers(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        response = await call_next(request)
-        if request.url.path.startswith("/admin"):
+        is_admin = request.url.path.startswith("/admin")
+        hosts = settings.admin_hosts
+        if is_admin and hosts and (request.url.hostname or "").lower() not in hosts:
+            response: Response = PlainTextResponse("Not Found", status_code=404)
+        else:
+            response = await call_next(request)
+        if is_admin:
             for name, value in _ADMIN_HEADERS.items():
                 response.headers.setdefault(name, value)
         return response
@@ -77,6 +89,7 @@ def create_app(settings: Settings | None = None, *, container: Container | None 
         return RedirectResponse("/admin/login", status_code=303)
 
     app.include_router(health.router)
+    app.include_router(webhook.router)
     app.include_router(web.router)
     app.mount(
         "/admin/static",

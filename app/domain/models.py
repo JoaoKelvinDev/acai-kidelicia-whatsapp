@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from app.domain.enums import (
     ConversationState,
+    DeliveryStatus,
     DraftState,
     IssueKind,
     MessageType,
@@ -41,6 +42,7 @@ class InboundMessage(BaseModel):
     timestamp: datetime
     received_at: datetime
     redacted_at: datetime | None = None  # texto removido pela política de retenção
+    provider_user_id: str | None = None  # identificador de usuário enviado pela Meta, se houver
 
 
 class Conversation(BaseModel):
@@ -51,6 +53,7 @@ class Conversation(BaseModel):
     assignee: str | None = None
     active_draft_id: str | None = None
     handoff_reason: str | None = None
+    provider_user_id: str | None = None
     # Incrementa a cada handoff/retomada/encerramento; respostas de época anterior são canceladas.
     reply_epoch: int = 0
     version: int = 0
@@ -139,6 +142,10 @@ class OutboundIntent(BaseModel):
     updated_at: datetime
     sent_at: datetime | None = None
     redacted_at: datetime | None = None
+    delivery_status: DeliveryStatus | None = None
+    delivered_at: datetime | None = None
+    read_at: datetime | None = None
+    delivery_error_code: int | None = None
 
 
 AuditValue = str | int | bool | None | list[str]
@@ -152,3 +159,15 @@ class AuditEvent(BaseModel):
     # Somente metadados (estados, motivos, nomes de campos). Nunca nome, telefone ou endereço.
     detail: dict[str, AuditValue] = Field(default_factory=dict)
     created_at: datetime
+
+
+class DeliveryStatusEvent(BaseModel):
+    """Status de entrega recebido pelo webhook (deduplicado pela chave)."""
+
+    idempotency_key: str
+    provider_message_id: str
+    status: DeliveryStatus
+    occurred_at: datetime
+    error_code: int | None = None
+    error_title: str | None = None
+    received_at: datetime

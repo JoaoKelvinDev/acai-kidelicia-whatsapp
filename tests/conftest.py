@@ -61,8 +61,8 @@ class Harness:
     def __init__(self, container: Container, clock: FixedClock) -> None:
         self.c = container
         self.clock = clock
-        assert isinstance(container.gateway, FakeGateway)
-        self.gateway: FakeGateway = container.gateway
+        # Com gateway real (simulado por MockTransport), `gateway` não é o fake.
+        self.gateway: FakeGateway = container.gateway  # type: ignore[assignment]
 
     def inbound(
         self,
@@ -137,7 +137,9 @@ def clock() -> FixedClock:
 async def harness_factory(clock: FixedClock, tmp_path: Path):
     containers: list[Container] = []
 
-    async def factory(*, db_path: Path | None = None, **store_overrides: Any) -> Harness:
+    async def factory(
+        *, db_path: Path | None = None, gateway: Any = None, **store_overrides: Any
+    ) -> Harness:
         path = db_path or tmp_path / f"db{len(containers)}.sqlite"
         url = sqlite_url(path)
         engine = create_engine(url)
@@ -147,13 +149,14 @@ async def harness_factory(clock: FixedClock, tmp_path: Path):
             clock=clock,
             store=make_store(**store_overrides),
             engine=engine,
+            gateway=gateway,
         )
         containers.append(container)
         return Harness(container, clock)
 
     yield factory
     for container in containers:
-        await container.engine.dispose()
+        await container.aclose()
 
 
 @pytest.fixture

@@ -23,6 +23,7 @@ class PurgeReport:
     messages_redacted: int = 0
     replies_redacted: int = 0
     drafts_redacted: int = 0
+    status_events_deleted: int = 0
     audit_deleted: int = 0
     sessions_deleted: int = 0
 
@@ -90,6 +91,7 @@ class RetentionService:
                     await tx.save_draft(draft)
                     report.drafts_redacted += 1
 
+        report.status_events_deleted = await tx.purge_status_events_before(cutoff)
         report.audit_deleted = await tx.purge_audit_before(now - self._audit_retention)
         report.sessions_deleted = await tx.purge_expired_sessions(now)
         await tx.add_audit(

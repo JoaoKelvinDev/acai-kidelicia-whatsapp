@@ -9,6 +9,7 @@ from app.core.clock import Clock, SystemClock
 from app.core.config import Settings
 from app.db.engine import create_engine
 from app.domain.store import StoreSettings
+from app.integrations.whatsapp.cloud import CloudApiGateway
 from app.integrations.whatsapp.fake import FakeGateway
 from app.integrations.whatsapp.gateway import MessagingGateway
 from app.repositories.base import Database
@@ -18,6 +19,7 @@ from app.services.conversation import ConversationService
 from app.services.dispatcher import Dispatcher, RetryPolicy
 from app.services.handoff import HandoffService
 from app.services.retention import RetentionService
+from app.services.webhook_events import WebhookEventService
 from app.workers.outbox import OutboxWorker
 
 
@@ -33,7 +35,14 @@ class Container:
     handoff: HandoffService
     auth: AuthService
     retention: RetentionService
+    webhook_events: WebhookEventService
     worker: OutboxWorker
+
+    async def aclose(self) -> None:
+        close = getattr(self.gateway, "aclose", None)
+        if close is not None:
+            await close()
+        await self.engine.dispose()
 
 
 def default_store_settings(settings: Settings) -> StoreSettings:
@@ -54,7 +63,7 @@ def build_container(
 ) -> Container:
     """`store` é a configuração usada enquanto nada foi salvo no banco."""
     clock = clock or SystemClock()
-    gateway = gateway or FakeGateway()
+    gateway = gateway or build_gateway(settings)
     engine = engine or create_engine(settings.database_url)
     db = SqlDatabase(engine, store or default_store_settings(settings))
     dispatcher = Dispatcher(
@@ -90,5 +99,20 @@ def build_container(
             retention_days=settings.retention_days,
             audit_retention_days=settings.audit_retention_days,
         ),
+        webhook_events=WebhookEventService(db, clock),
         worker=OutboxWorker(dispatcher, settings.outbox_poll_seconds),
+    )
+
+
+def build_gateway(settings: Settings) -> MessagingGateway:
+    if settings.whatsapp_gateway == "fake":
+        return FakeGateway()
+    # Validado em Settings: credenciais presentes, nunca com APP_ENV=local.
+    assert settings.whatsapp_access_token and settings.whatsapp_phone_number_id
+    return CloudApiGateway(
+        access_token=settings.whatsapp_access_token.get_secret_value(),
+        phone_number_id=settings.whatsapp_phone_number_id,
+        api_version=settings.meta_graph_api_version,
+        allowed_recipients=settings.allowed_recipients,
+        timeout_seconds=settings.whatsapp_api_timeout_seconds,
     )

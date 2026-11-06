@@ -41,7 +41,7 @@ def _run(settings: Settings, action: Callable[[Container], Awaitable[None]]) -> 
         try:
             await action(container)
         finally:
-            await container.engine.dispose()
+            await container.aclose()
 
     asyncio.run(runner())
 

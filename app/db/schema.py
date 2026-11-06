@@ -40,6 +40,7 @@ conversations = Table(
     Column("assignee", String(80), nullable=True),
     Column("active_draft_id", String(32), nullable=True),
     Column("handoff_reason", String(80), nullable=True),
+    Column("provider_user_id", String(128), nullable=True),
     Column("reply_epoch", Integer, nullable=False),
     Column("version", Integer, nullable=False),
     Column("created_at", UTCDateTime(), nullable=False),
@@ -56,6 +57,7 @@ inbound_messages = Table(
     Column("timestamp", UTCDateTime(), nullable=False),
     Column("received_at", UTCDateTime(), nullable=False),
     Column("redacted_at", UTCDateTime(), nullable=True),
+    Column("provider_user_id", String(128), nullable=True),
 )
 
 order_drafts = Table(
@@ -92,11 +94,28 @@ outbound_messages = Table(
     Column("updated_at", UTCDateTime(), nullable=False),
     Column("sent_at", UTCDateTime(), nullable=True),
     Column("redacted_at", UTCDateTime(), nullable=True),
+    Column("delivery_status", String(20), nullable=True),
+    Column("delivered_at", UTCDateTime(), nullable=True),
+    Column("read_at", UTCDateTime(), nullable=True),
+    Column("delivery_error_code", Integer, nullable=True),
 )
+Index("ix_outbound_messages_provider_message_id", outbound_messages.c.provider_message_id)
 Index(
     "ix_outbound_messages_status_next",
     outbound_messages.c.status,
     outbound_messages.c.next_attempt_at,
+)
+
+delivery_status_events = Table(
+    "delivery_status_events",
+    metadata,
+    Column("idempotency_key", String(400), primary_key=True),
+    Column("provider_message_id", String(255), nullable=False, index=True),
+    Column("status", String(20), nullable=False),
+    Column("occurred_at", UTCDateTime(), nullable=False),
+    Column("error_code", Integer, nullable=True),
+    Column("error_title", String(200), nullable=True),
+    Column("received_at", UTCDateTime(), nullable=False, index=True),
 )
 
 audit_events = Table(

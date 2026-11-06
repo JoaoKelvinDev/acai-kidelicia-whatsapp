@@ -2,8 +2,10 @@
 
 Backend de atendimento para o WhatsApp da loja. Requisitos completos em [`CLAUDE.md`](CLAUDE.md).
 
-**Situação: Etapa 2 concluída — estado durável e controle humano.** Ainda sem conexão com a Meta
-(Etapa 3), sem IA (Etapa 4) e sem o número real da loja (Etapa 5).
+**Situação: Etapa 3 implementada — integração com a WhatsApp Cloud API em ambiente de teste.**
+Validação real com o número de teste da Meta pendente (conta com erro 131031; ver
+[docs/configuracao-meta.md](docs/configuracao-meta.md)). Sem IA (Etapa 4) e sem o número real da
+loja (Etapa 5).
 
 ## Como rodar
 
@@ -26,6 +28,23 @@ Testes e qualidade:
 uv run pytest
 uv run ruff check . && uv run ruff format --check .
 ```
+
+## WhatsApp Cloud API
+
+- `GET /webhook/whatsapp`: verificação da Meta (token em `WHATSAPP_VERIFY_TOKEN`).
+- `POST /webhook/whatsapp`: eventos assinados. A assinatura `X-Hub-Signature-256` é conferida
+  sobre o corpo bruto **antes** de ler o conteúdo. Todos os itens de cada notificação são lidos.
+  - **Mensagens** seguem o fluxo de atendimento; **status** (enviada, entregue, lida, falhou)
+    atualizam a resposta, deduplicados e sem regredir; **eco do app do celular**
+    (`smb_message_echoes`, coexistência) pausa a automação da conversa.
+  - Eventos de outro número e mensagens do próprio número são ignorados (sem loop).
+- Envio: `WHATSAPP_GATEWAY=cloud`. Falhas classificadas em retentável (limite, 5xx, conexão),
+  incerta (timeout após envio; nunca reenviada) e definitiva (ex.: fora da janela de 24 h).
+- Travas: `cloud` é recusado com `APP_ENV=local`; fora de produção exige
+  `WHATSAPP_ALLOWED_RECIPIENTS` e bloqueia qualquer outro destinatário antes de chamar a Meta.
+- Guias: [configuração da Meta](docs/configuracao-meta.md) ·
+  [sessão de teste com túnel e desativação](docs/teste-com-tunel.md) ·
+  [investigação do número da loja](docs/investigacao-numero-loja.md).
 
 ## Comandos de operação
 
@@ -117,11 +136,11 @@ app/
   services/                conversa, transições, despacho, handoff, autenticação, retenção
   workers/outbox.py        fila de envio em segundo plano
   web/                     painel: rotas, textos, templates, CSS
-  integrations/whatsapp/   contrato do gateway + gateway falso
+  integrations/whatsapp/   contrato, gateway falso, gateway Cloud API, leitura do webhook
   repositories/            contrato (Database/Tx) + implementação SQL
-  api/                     health e simulação
+  api/                     health, webhook da Meta e simulação
 migrations/                Alembic
-tests/                     235 testes sobre SQLite real; fixtures sintéticas
+tests/                     312 testes sobre SQLite real; fixtures sintéticas
 ```
 
 ### Garantias
@@ -148,4 +167,8 @@ tests/                     235 testes sobre SQLite real; fixtures sintéticas
 - SQLite atende um único servidor. Para produção, propor PostgreSQL (mesmo esquema e
   migrações; falta só o driver `asyncpg` e testes nele).
 - Parser baseado na mensagem de referência do `CLAUDE.md`; o código do site não foi inspecionado.
-- Sem webhook real, sem verificação de assinatura, sem FAQ e sem IA (Etapas 3 e 4).
+- Eco do app do celular (coexistência) implementado, mas só validável com o número real.
+- Token temporário da Meta expira em ~24 h; token permanente (usuário do sistema) fica para a
+  Etapa 5, no portfólio da loja.
+- Processamento do webhook é síncrono (rápido, sem IA). Com IA (Etapa 4), passa para fila.
+- Sem FAQ e sem IA (Etapa 4).

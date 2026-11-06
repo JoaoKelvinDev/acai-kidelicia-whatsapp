@@ -12,6 +12,7 @@ from app.domain.enums import ConversationState, OutboundStatus
 from app.domain.models import (
     AuditEvent,
     Conversation,
+    DeliveryStatusEvent,
     InboundMessage,
     OrderDraft,
     OutboundIntent,
@@ -76,6 +77,18 @@ class Tx(Protocol):
     async def list_outbound(
         self, conversation_id: str, status: OutboundStatus | None = None
     ) -> list[OutboundIntent]: ...
+
+    async def get_outbound_by_provider_id(
+        self, provider_message_id: str
+    ) -> OutboundIntent | None: ...
+
+    async def add_status_event(self, event: DeliveryStatusEvent) -> bool:
+        """False se o mesmo status já foi recebido (webhook repetido)."""
+        ...
+
+    async def list_status_events(self, provider_message_id: str) -> list[DeliveryStatusEvent]: ...
+
+    async def purge_status_events_before(self, cutoff: datetime) -> int: ...
 
     async def list_due_outbound(self, now: datetime, limit: int) -> list[OutboundIntent]: ...
 

@@ -80,7 +80,7 @@
   <ol class="timeline">
     {% for item in timeline %}
     <li class="{{ 'in' if item.inbound else 'out' }}">
-      <span class="meta">{{ 'Cliente' if item.inbound else 'Assistente' }} · {{ local(item.at) }}{% if not item.inbound %} · {{ labels.OUTBOUND_STATUS_LABELS[item.status] }}{% endif %}</span>
+      <span class="meta">{{ 'Cliente' if item.inbound else 'Assistente' }} · {{ local(item.at) }}{% if not item.inbound %} · {{ labels.DELIVERY_LABELS[item.delivery] if item.delivery else labels.OUTBOUND_STATUS_LABELS[item.status] }}{% if item.delivery_error %} (código {{ item.delivery_error }}){% endif %}{% endif %}</span>
       {% if item.redacted %}
       <em class="muted">conteúdo removido (retenção)</em>
       {% elif item.inbound and item.type.value != "text" %}

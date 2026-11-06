@@ -92,6 +92,8 @@ class ConversationService:
                 msg.timestamp if last is None else max(last, msg.timestamp)
             )
             conv.last_inbound_message_id = msg.provider_message_id
+            if msg.provider_user_id:
+                conv.provider_user_id = msg.provider_user_id
             conv.updated_at = now
             ctx = _Ctx(tx=tx, conv=conv, store=store, msg=msg, now=now)
 

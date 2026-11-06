@@ -257,3 +257,27 @@ def test_cli_purge_dry_run(panel, capsys):
     assert panel.run_cli("purge", "--dry-run") == 0
     out = capsys.readouterr().out
     assert "dry_run: True" in out
+
+
+def test_panel_can_be_restricted_to_local_hosts(app_factory):
+    client = app_factory(admin_allowed_hosts="localhost,127.0.0.1").client
+    via_tunnel = client.get("/admin/login", headers={"host": "algo.trycloudflare.com"})
+    assert via_tunnel.status_code == 404
+    assert (
+        client.get("/admin/static/admin.css", headers={"host": "x.trycloudflare.com"}).status_code
+        == 404
+    )
+    assert client.get("/admin/login", headers={"host": "localhost:8000"}).status_code == 200
+    assert client.get("/health", headers={"host": "algo.trycloudflare.com"}).status_code == 200
+
+
+def test_timeline_keeps_reply_after_message_despite_provider_clock(panel):
+    """Caso real (06/11/2026): horário da Meta arredondado à frente do relógio local."""
+    from datetime import UTC, datetime, timedelta
+
+    client = panel.client
+    ahead = (datetime.now(UTC) + timedelta(seconds=2)).isoformat()
+    client.post("/dev/simulate/inbound", json={"from": SENDER, "text": "Oi", "timestamp": ahead})
+    login(client, "maria")
+    page = client.get(f"/admin/conversas/{SENDER}").text
+    assert page.index("Cliente ·") < page.index("Assistente ·")

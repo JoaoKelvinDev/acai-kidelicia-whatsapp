@@ -19,6 +19,7 @@ from app.domain.enums import ConversationState, OutboundStatus
 from app.domain.models import (
     AuditEvent,
     Conversation,
+    DeliveryStatusEvent,
     InboundMessage,
     OrderDraft,
     OutboundIntent,
@@ -93,7 +94,7 @@ class SqlTx:
             update(t.inbound_messages)
             .where(c.conversation_id == conversation_id, c.timestamp < cutoff)
             .where(c.redacted_at.is_(None))
-            .values(text=None, redacted_at=now)
+            .values(text=None, provider_user_id=None, redacted_at=now)
         )
         return result.rowcount
 
@@ -223,6 +224,42 @@ class SqlTx:
             .values(**intent.model_dump(exclude={"id"}))
         )
         return result.rowcount == 1
+
+    async def get_outbound_by_provider_id(self, provider_message_id: str) -> OutboundIntent | None:
+        row = (
+            await self._conn.execute(
+                select(t.outbound_messages).where(
+                    t.outbound_messages.c.provider_message_id == provider_message_id
+                )
+            )
+        ).first()
+        return OutboundIntent.model_validate(_mapping(row)) if row else None
+
+    async def add_status_event(self, event: DeliveryStatusEvent) -> bool:
+        c = t.delivery_status_events.c
+        existing = await self._conn.scalar(
+            select(c.idempotency_key).where(c.idempotency_key == event.idempotency_key)
+        )
+        if existing is not None:
+            return False
+        return await self._insert_unique(
+            insert(t.delivery_status_events).values(**event.model_dump())
+        )
+
+    async def list_status_events(self, provider_message_id: str) -> list[DeliveryStatusEvent]:
+        c = t.delivery_status_events.c
+        rows = await self._conn.execute(
+            select(t.delivery_status_events)
+            .where(c.provider_message_id == provider_message_id)
+            .order_by(c.occurred_at)
+        )
+        return [DeliveryStatusEvent.model_validate(_mapping(r)) for r in rows]
+
+    async def purge_status_events_before(self, cutoff: datetime) -> int:
+        result = await self._conn.execute(
+            delete(t.delivery_status_events).where(t.delivery_status_events.c.received_at < cutoff)
+        )
+        return result.rowcount
 
     async def list_outbound(
         self, conversation_id: str, status: OutboundStatus | None = None
